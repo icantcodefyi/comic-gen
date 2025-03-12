@@ -51,6 +51,7 @@ model User {
     favoriteComics Comic[]    @relation("UserFavorites")
     createdAt      DateTime   @default(now())
     updatedAt      DateTime   @updatedAt
+    Post           Post[]
 }
 
 model VerificationToken {
@@ -136,4 +137,16 @@ enum Visibility {
     PRIVATE
     UNLISTED
     PUBLIC
+}
+
+model Post {
+    id        Int      @id @default(autoincrement())
+    name      String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    createdBy   User   @relation(fields: [createdById], references: [id])
+    createdById String
+
+    @@index([name])
 }
