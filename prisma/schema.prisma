@@ -1,47 +1,28 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
     provider = "prisma-client-js"
 }
 
 datasource db {
     provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([name])
-}
-
-// Necessary for Next auth
+// Next Auth Models
 model Account {
     id                       String  @id @default(cuid())
     userId                   String
     type                     String
     provider                 String
     providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
+    refresh_token            String? @db.Text
+    access_token             String? @db.Text
     expires_at               Int?
     token_type               String?
     scope                    String?
-    id_token                 String? // @db.Text
+    id_token                 String? @db.Text
     session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
     refresh_token_expires_in Int?
+    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([provider, providerAccountId])
 }
@@ -54,6 +35,7 @@ model Session {
     user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Enhanced User Model with Comic Relations
 model User {
     id            String    @id @default(cuid())
     name          String?
@@ -62,7 +44,13 @@ model User {
     image         String?
     accounts      Account[]
     sessions      Session[]
-    posts         Post[]
+
+    // Comic Generator Relations
+    comics         Comic[]
+    templates      Template[] @relation("TemplateCreator")
+    favoriteComics Comic[]    @relation("UserFavorites")
+    createdAt      DateTime   @default(now())
+    updatedAt      DateTime   @updatedAt
 }
 
 model VerificationToken {
@@ -71,4 +59,81 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+// Comic Generator Models
+model Comic {
+    id          String      @id @default(cuid())
+    title       String
+    description String?     @db.Text
+    status      ComicStatus @default(DRAFT) // Status of comic generation
+    visibility  Visibility  @default(PRIVATE) // Visibility of the comic
+    progress    Float       @default(0) // Generation progress percentage
+    error       String?     @db.Text // To store error messages, if any
+
+    // Relations
+    creator     User      @relation(fields: [creatorId], references: [id])
+    creatorId   String
+    panels      Panel[]
+    template    Template? @relation(fields: [templateId], references: [id])
+    templateId  String?
+    favoritedBy User[]    @relation("UserFavorites")
+
+    // Metadata
+    tags      String[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Panel {
+    id         String  @id @default(cuid())
+    orderIndex Int
+    script     String? @db.Text
+    imageUrl   String?
+
+    // Style Configuration
+    styleConfig Json?
+
+    // Relations
+    comic   Comic  @relation(fields: [comicId], references: [id], onDelete: Cascade)
+    comicId String
+
+    // Metadata
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([comicId, orderIndex])
+}
+
+model Template {
+    id          String  @id @default(cuid())
+    name        String
+    description String? @db.Text
+
+    // Template Configuration
+    config     Json
+    previewUrl String?
+
+    // Relations
+    creator   User    @relation("TemplateCreator", fields: [creatorId], references: [id])
+    creatorId String
+    comics    Comic[]
+
+    // Metadata
+    isPublic  Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+enum ComicStatus {
+    DRAFT
+    GENERATING
+    PUBLISHED
+    ARCHIVED
+}
+
+enum Visibility {
+    PRIVATE
+    UNLISTED
+    PUBLIC
 }
